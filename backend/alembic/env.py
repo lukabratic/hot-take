@@ -1,5 +1,6 @@
 import asyncio
 from logging.config import fileConfig
+import os
 
 from alembic import context
 from sqlalchemy import pool
@@ -12,6 +13,27 @@ from models import Base
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+def _get_async_url() -> str:
+    """Get database URL and ensure it uses asyncpg driver."""
+    # Try environment variable directly first, then fall back to settings
+    url = os.environ.get("DATABASE_URL", "")
+    if not url:
+        from config import settings
+        url = settings.database_url
+
+    # Force asyncpg driver
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif not url.startswith("postgresql+asyncpg://"):
+        url = "postgresql+asyncpg://" + url.split("://", 1)[-1] if "://" in url else url
+
+    return url
+
+
+db_url = _get_async_url()
 
 # Override sqlalchemy.url with the value from application settings
 config.set_main_option("sqlalchemy.url", settings.database_url)
