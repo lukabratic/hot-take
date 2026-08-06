@@ -8,11 +8,10 @@ redis==5.0.7
 httpx==0.27.0
 hypothesis==6.104.2
 asyncpg==0.29.0
+psycopg2-binary==2.9.9
 python-jose[cryptography]==3.3.0
 pytest==8.2.2
 pytest-asyncio==0.23.7
 kagglehub==0.3.6
 nba_api==1.11.4
 pandas==2.2.2
-nba_api==1.11.4
-pandas>=2.0.0
