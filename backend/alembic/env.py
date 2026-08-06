@@ -49,8 +49,14 @@ async def run_async_migrations() -> None:
     """Run migrations in 'online' mode using an async engine."""
     from sqlalchemy.ext.asyncio import create_async_engine
 
+    url = settings.database_url
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+
     connectable = create_async_engine(
-        settings.database_url,
+        url,
         poolclass=pool.NullPool,
     )
 
