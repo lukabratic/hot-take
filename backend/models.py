@@ -108,7 +108,7 @@ class Ranking(Base):
     __tablename__ = "rankings"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     roll_id = Column(Integer, ForeignKey("rolls.id"), nullable=False)
     rubric = Column(String(20), nullable=False)  # "analytics" or "reputation"
     player_order = Column(JSON, nullable=False)  # [player_id, player_id, ...]
@@ -119,9 +119,8 @@ class Ranking(Base):
         TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "roll_id", name="uq_user_daily_ranking"),
-    )
+    # Unique constraint is handled via partial index in migration 0003
+    # (only enforced when user_id IS NOT NULL)
 
     user = relationship("User", back_populates="rankings")
     roll = relationship("Roll", back_populates="rankings")

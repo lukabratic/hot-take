@@ -107,7 +107,7 @@ class RankingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    user_id: UUID
+    user_id: UUID | None
     roll_id: int
     rubric: Rubric
     player_order: list[int]

@@ -57,22 +57,22 @@ async def get_daily(
 ):
     """Get today's daily challenge Roll.
 
-    Requires authentication. Returns the same Roll for all users on
+    Authentication is optional. Returns the same Roll for all users on
     the same calendar day (UTC), including selected players.
-    If the user already submitted today, returns 409 with ranking ID.
+    If the user is authenticated and already submitted today, returns 409 with ranking ID.
     """
     from auth.middleware import _decode_clerk_jwt
 
     token = _get_user_id_from_header(authorization)
-    if token is None:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    clerk_id = None
 
-    # Decode JWT to get actual clerk_id (sub claim)
-    try:
-        payload = await _decode_clerk_jwt(token)
-        clerk_id = payload.get("sub")
-    except Exception:
-        clerk_id = None
+    if token is not None:
+        # Decode JWT to get actual clerk_id (sub claim)
+        try:
+            payload = await _decode_clerk_jwt(token)
+            clerk_id = payload.get("sub")
+        except Exception:
+            clerk_id = None
 
     today = datetime.now(timezone.utc).date()
     roll = await get_daily_challenge(today, redis_client)

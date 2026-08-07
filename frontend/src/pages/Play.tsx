@@ -123,7 +123,7 @@ export function Play() {
               setError("You already completed today's challenge!");
             }
           } else if (axiosErr.response?.status === 401) {
-            setError('Please sign in to play the Daily Challenge.');
+            setError('Failed to load challenge. Please try again.');
           } else {
             setError('Failed to load challenge. Please try again.');
           }

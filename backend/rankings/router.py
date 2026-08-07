@@ -212,19 +212,22 @@ async def _update_community_aggregates(
 @router.post("", response_model=RankingResponse, status_code=status.HTTP_201_CREATED)
 async def submit_ranking(
     request: RankingSubmitRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User | None, Depends(get_optional_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
     redis_client: Annotated[redis.Redis, Depends(get_redis_client)],
 ) -> Ranking:
     """Submit a ranking for scoring.
+
+    Authentication is optional. If authenticated, the ranking is associated
+    with the user and updates leaderboards/streaks. If not authenticated,
+    the ranking is stored anonymously (no leaderboard/streak updates).
 
     Validates the ranking is an exact permutation of the Roll's player set,
     computes the consensus ranking based on the selected rubric, calculates
     Kendall tau distance, assigns a letter grade, stores the ranking, and
     updates community aggregates.
 
-    Returns 409 if the user has already submitted a ranking for this Roll
-    (applies to daily mode to prevent duplicate daily submissions).
+    Returns 409 if an authenticated user has already submitted a ranking for this Roll.
     """
     # Fetch the Roll
     roll_result = await session.execute(
@@ -238,20 +241,21 @@ async def submit_ranking(
             detail="Roll not found",
         )
 
-    # Check for duplicate submission (prevents re-submission for same roll)
-    existing_result = await session.execute(
-        select(Ranking).where(
-            Ranking.user_id == current_user.id,
-            Ranking.roll_id == request.roll_id,
+    # Check for duplicate submission only for authenticated users
+    if current_user is not None:
+        existing_result = await session.execute(
+            select(Ranking).where(
+                Ranking.user_id == current_user.id,
+                Ranking.roll_id == request.roll_id,
+            )
         )
-    )
-    existing_ranking = existing_result.scalar_one_or_none()
+        existing_ranking = existing_result.scalar_one_or_none()
 
-    if existing_ranking is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Already submitted a ranking for this roll",
-        )
+        if existing_ranking is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Already submitted a ranking for this roll",
+            )
 
     # Get the Roll's player set
     roll_players_result = await session.execute(
@@ -292,7 +296,7 @@ async def submit_ranking(
 
     # Store the ranking
     ranking = Ranking(
-        user_id=current_user.id,
+        user_id=current_user.id if current_user else None,
         roll_id=request.roll_id,
         rubric=request.rubric,
         player_order=request.player_order,
@@ -307,19 +311,21 @@ async def submit_ranking(
         request.roll_id, request.player_order, session, redis_client
     )
 
-    # Update streak if this is a daily challenge completion
-    if roll.mode == "daily" and roll.daily_date is not None:
-        update_streak(current_user, roll.daily_date)
+    # Only update streak and leaderboard for authenticated users
+    if current_user is not None:
+        # Update streak if this is a daily challenge completion
+        if roll.mode == "daily" and roll.daily_date is not None:
+            update_streak(current_user, roll.daily_date)
 
-    # Update leaderboard scores in Redis
-    leaderboard_score = _compute_score_from_grade(grade)
-    await update_leaderboard_scores(current_user.id, leaderboard_score, redis_client)
+        # Update leaderboard scores in Redis
+        leaderboard_score = _compute_score_from_grade(grade)
+        await update_leaderboard_scores(current_user.id, leaderboard_score, redis_client)
 
-    # Update category leaderboard if this roll has a category_value
-    if roll.category_value is not None:
-        await update_category_leaderboard(
-            current_user.id, roll.category_value, leaderboard_score, redis_client
-        )
+        # Update category leaderboard if this roll has a category_value
+        if roll.category_value is not None:
+            await update_category_leaderboard(
+                current_user.id, roll.category_value, leaderboard_score, redis_client
+            )
 
     await session.commit()
     await session.refresh(ranking)
