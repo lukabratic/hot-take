@@ -11,6 +11,10 @@ venv/
 .env.local
 .env.production
 
+# Docker Compose secrets (see secrets/pg_password.txt.example)
+secrets/*
+!secrets/*.example
+
 # IDE
 .vscode/
 .idea/
